@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>European Energy Dashboard - Time Zone Aware</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.3/luxon.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    body {
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #f0f8ff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    header {
+      text-align: center;
+      padding: 30px 0;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 15px;
+      margin-bottom: 25px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(79, 195, 247, 0.3);
+    }
+    
+    h1 {
+      font-size: 2.8rem;
+      color: #4fc3f7;
+      margin-bottom: 15px;
+      text-shadow: 0 0 12px rgba(79, 195, 247, 0.7);
+    }
+    
+    .subtitle {
+      font-size: 1.2rem;
+      max-width: 800px;
+      margin: 0 auto;
+      line-height: 1.6;
+      color: #bbdefb;
+    }
+    
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(650px, 1fr));
+      gap: 25px;
+      margin-top: 20px;
+    }
+    
+    .panel {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+      border: 1px solid rgba(79, 195, 247, 0.2);
+    }
+    
+    .panel:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(79, 195, 247, 0.5);
+    }
+    
+    .panel h2 {
+      color: #4fc3f7;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid rgba(79, 195, 247, 0.3);
+      text-align: center;
+    }
+    
+    .chart-container {
+      height: 350px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 15px;
+      margin: 25px 0;
+      border: 1px solid rgba(79, 195, 247, 0.2);
+    }
+    
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    label {
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #bbdefb;
+      font-size: 1.1rem;
+    }
+    
+    select {
+      padding: 12px 20px;
+      border-radius: 8px;
+      border: none;
+      background: rgba(33, 150, 243, 0.2);
+      color: white;
+      font-size: 1rem;
+      min-width: 220px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(79, 195, 247, 0.3);
+    }
+    
+    select:hover {
+      background: rgba(33, 150, 243, 0.3);
+      box-shadow: 0 0 10px rgba(79, 195, 247, 0.3);
+    }
+    
+    .timezone-info {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-top: 25px;
+    }
+    
+    .timezone-card {
+      background: rgba(33, 150, 243, 0.15);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      border-top: 3px solid #4fc3f7;
+      transition: transform 0.3s ease;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    .timezone-card:hover {
+      transform: translateY(-5px);
+      background: rgba(33, 150, 243, 0.25);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .timezone-card h3 {
+      color: #4fc3f7;
+      margin-bottom: 15px;
+      font-size: 1.4rem;
+    }
+    
+    .time {
+      font-size: 1.5rem;
+      font-weight: bold;
+      margin: 15px 0;
+      color: #e1f5fe;
+    }
+    
+    .offset {
+      font-size: 1.1rem;
+      color: #bbdefb;
+    }
+    
+    .tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.85);
+      color: white;
+      padding: 12px;
+      border-radius: 8px;
+      pointer-events: none;
+      font-size: 14px;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+      z-index: 100;
+      max-width: 300px;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(79, 195, 247, 0.5);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .explanation {
+      margin-top: 20px;
+      padding: 15px;
+      background: rgba(33, 150, 243, 0.1);
+      border-radius: 10px;
+      border-left: 4px solid #4fc3f7;
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+    
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      padding: 25px;
+      color: #90a4ae;
+      font-size: 0.95rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .metric-highlight {
+      color: #4fc3f7;
+      font-weight: bold;
+    }
+    
+    .stats-container {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 20px;
+      text-align: center;
+    }
+    
+    .stat-card {
+      background: rgba(33, 150, 243, 0.15);
+      border-radius: 10px;
+      padding: 15px;
+      width: 30%;
+      transition: all 0.3s ease;
+    }
+    
+    .stat-card:hover {
+      transform: translateY(-3px);
+      background: rgba(33, 150, 243, 0.25);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    .stat-value {
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #4fc3f7;
+      margin: 10px 0;
+    }
+    
+    .stat-label {
+      font-size: 1rem;
+      color: #bbdefb;
+    }
+    
+    .consumption-levels {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+    
+    .level-card {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.07);
+      padding: 10px 15px;
+      border-radius: 8px;
+    }
+    
+    .level-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      margin-right: 10px;
+    }
+    
+    @media (max-width: 768px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+      
+      .timezone-info {
+        grid-template-columns: 1fr;
+      }
+      
+      .controls {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .stats-container {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .stat-card {
+        width: 80%;
+        margin-bottom: 15px;
+      }
+      
+      .consumption-levels {
+        flex-direction: column;
+        align-items: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>European Energy Consumption Dashboard</h1>
+      <p class="subtitle">Time Zone Aware Visualization of Energy Data Across European Time Zones</p>
+    </header>
+    
+    <div class="controls">
+      <div class="control-group">
+        <label for="country-select">Select Country Data:</label>
+        <select id="country-select">
+          <option value="Portugal" data-timezone="Europe/Lisbon" data-filename="MyEnergyData_MarketDocument_portugal.xml">Portugal (WET/WEST)</option>
+          <option value="Germany" data-timezone="Europe/Berlin" data-filename="MyEnergyData_MarketDocument_germany.xml">Germany (CET/CEST)</option>
+          <option value="Estonia" data-timezone="Europe/Tallinn" data-filename="MyEnergyData_MarketDocument_estonia.xml">Estonia (EET/EEST)</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+      <label for="aggregation-select">Aggregation Level:</label>
+      <select id="aggregation-select">
+        <option value="hourly">Hourly</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
+    </div>
+    </div>
+    
+    <div class="timezone-info">
+      <div class="timezone-card">
+        <h3>Western Europe (WET)</h3>
+        <div class="time" id="gmt-time">00:00:00</div>
+        <div class="offset" id="gmt-offset">UTC+00:00</div>
+        <div>Portugal, UK, Ireland</div>
+      </div>
+      
+      <div class="timezone-card">
+        <h3>Central Europe (CET)</h3>
+        <div class="time" id="cet-time">00:00:00</div>
+        <div class="offset" id="cet-offset">UTC+01:00</div>
+        <div>Germany, France, Italy</div>
+      </div>
+      
+      <div class="timezone-card">
+        <h3>Eastern Europe (EET)</h3>
+        <div class="time" id="eet-time">00:00:00</div>
+        <div class="offset" id="eet-offset">UTC+02:00</div>
+        <div>Finland, Estonia, Greece</div>
+      </div>
+    </div>
+    
+    <div class="dashboard">
+      <div class="panel" id="timeline-panel">
+        <h2>Energy Consumption Timeline (Local Time)</h2>
+        <div id="timeline-chart" class="chart-container"></div>
+        <div class="explanation">
+          Shows average hourly energy consumption for the selected country. This aggregated view smooths out noise and clearly reveals the daily pattern. <span class="metric-highlight">Morning</span> and <span class="metric-highlight">evening</span> peaks are clearly visible.
+        </div>
+      </div>
+      
+      <div class="panel">
+        <h2>Same UTC Time Comparison</h2>
+        <div id="utc-comparison-chart" class="chart-container"></div>
+        <div class="explanation">
+          Compares energy consumption at the same UTC moment across different time zones. 
+          Highlights how the same physical time corresponds to different local times and activity levels.
+        </div>
+      </div>
+      
+      <div class="panel">
+        <h2>Daily Pattern Comparison</h2>
+        <div id="pattern-comparison-chart" class="chart-container"></div>
+        <div class="explanation">
+          Shows average hourly energy patterns aligned by local time. 
+          Reveals how consumption patterns are similar across time zones when aligned by the hour of the day.
+        </div>
+      </div>
+
+      <div class="panel" >
+        <h2>Consumption Level Distribution</h2>
+        <div id="distribution-chart" class="chart-container"></div>
+        <div class="consumption-levels" id="levels-container"></div>
+        <div class="stats-container" id="stats-container"></div>
+        <div class="explanation">
+          Shows how the raw energy consumption readings are distributed across different intensity levels. 
+          <span class="metric-highlight">Low</span> consumption indicates off-peak hours, 
+          <span class="metric-highlight">Medium</span> represents regular usage, and 
+          <span class="metric-highlight">High</span> shows peak demand periods.
+        </div>
+      </div>
+    </div>
+    
+    <footer>
+      European Energy Data Dashboard | Time Zone Aware Visualization | Data integrated from XML files
+    </footer>
+  </div>
+
+  <script>
+    // --- SCRIPT START ---
+    // Cache for loaded data to avoid re-fetching files
+    const allData = {};
+
+    async function fetchAndParseXML(filename, timezone) {
+        try {
+            const response = await fetch(filename);
+            if (!response.ok) {
+                throw new Error(`File not found or network error: ${response.statusText}`);
+            }
+            const xmlString = await response.text();
+            return parseXML(xmlString, timezone);
+        } catch (error) {
+          
+            console.error(`Error fetching or parsing ${filename}:`, error);
+            return null; // Return null to indicate failure
+        }
+    }
+
+    function parseXML(xmlString, timezone) {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+      const namespace = "urn:entsoe.eu:wgedi:MyEnergyData:10:1";
+      const periods = xmlDoc.getElementsByTagNameNS(namespace, "Period");
+      const data = [];
+      
+      for (let i = 0; i < periods.length; i++) {
+        const period = periods[i];
+        const timeInterval = period.getElementsByTagNameNS(namespace, "timeInterval")[0];
+        const point = period.getElementsByTagNameNS(namespace, "Point")[0];
+        
+        if (!timeInterval || !point) continue;
+
+        const startTimeStr = timeInterval.getElementsByTagNameNS(namespace, "start")[0].textContent;
+        const energy = parseFloat(point.getElementsByTagNameNS(namespace, "out_Quantity.quantity")[0].textContent);
+        
+        const dt = luxon.DateTime.fromSQL(startTimeStr, { zone: timezone });
+        const co2 = energy * 0.5;
+
+        data.push({
+          timestamp: dt.toISO(),
+          hour: dt.hour,
+          minute: dt.minute,
+          utcHour: dt.toUTC().hour,
+          energy: energy,
+          co2: co2,
+          intensity: co2 / energy
+        });
+      }
+      
+      return data;
+    }
+
+    // Aggregate raw data into hourly averages
+    function aggregateDataByHour(data) {
+        if (!data || data.length === 0) {
+            return [];
+        }
+
+        // Group data by the 'hour' property
+        const groupedByHour = d3.group(data, d => d.hour);
+
+        // For each hour, calculate the average energy and CO2
+        const aggregated = Array.from(groupedByHour, ([hour, values]) => {
+            return {
+                hour: hour,
+                minute: 0, // We are representing the whole hour
+                energy: d3.mean(values, v => v.energy),
+                co2: d3.mean(values, v => v.co2),
+                timestamp: values[0].timestamp // Use a representative timestamp
+            };
+        });
+
+        // Sort by hour to ensure the line chart is drawn correctly
+        aggregated.sort((a, b) => a.hour - b.hour);
+        
+        return aggregated;
+    }
+
+    function aggregateDataByDay(rawData) {
+      if (!rawData || rawData.length === 0) return [];
+      const grouped = d3.group(rawData, d => 
+        luxon.DateTime.fromISO(d.timestamp).toFormat('yyyy-MM-dd')
+      );
+      
+      const aggregated = Array.from(grouped, ([date, values]) => ({
+        date,
+        dateObj: new Date(date),
+        energy: d3.sum(values, v => v.energy),
+        co2: d3.sum(values, v => v.co2)
+      }));
+
+      aggregated.sort((a, b) => a.dateObj - b.dateObj);
+      return aggregated;
+    }
+
+    function aggregateDataByWeek(rawData) {
+      if (!rawData || rawData.length === 0) return [];
+      const grouped = d3.group(rawData, d => 
+        luxon.DateTime.fromISO(d.timestamp).startOf('week').toISODate()
+      );
+      
+      const aggregated = Array.from(grouped, ([weekStart, values]) => ({
+        weekStart,
+        dateObj: new Date(weekStart),
+        energy: d3.sum(values, v => v.energy),
+        co2: d3.sum(values, v => v.co2)
+      }));
+
+      aggregated.sort((a, b) => a.dateObj - b.dateObj);
+      return aggregated;
+    }
+
+    function aggregateDataByMonth(rawData) {
+      if (!rawData || rawData.length === 0) return [];
+      const grouped = d3.group(rawData, d => 
+        luxon.DateTime.fromISO(d.timestamp).toFormat('yyyy-MM')
+      );
+      
+      const aggregated = Array.from(grouped, ([month, values]) => ({
+        month,
+        dateObj: new Date(`${month}-01`),
+        energy: d3.sum(values, v => v.energy),
+        co2: d3.sum(values, v => v.co2)
+      }));
+
+      aggregated.sort((a, b) => a.dateObj - b.dateObj);
+      return aggregated;
+    }
+
+    function showLoading(selector) {
+        const container = d3.select(selector);
+        container.selectAll("*").remove();
+        container.append("div")
+            .style("color", "#bbdefb")
+            .style("font-size", "1.2rem")
+            .text("Loading data...");
+    }
+
+    function showError(selector, country) {
+        const container = d3.select(selector);
+        container.selectAll("*").remove();
+        container.append("div")
+            .style("color", "#ff8a80")
+            .style("font-size", "1.1rem")
+            .html(`Failed to load data for ${country}.<br>Please ensure the XML file is in the same directory and check the console for errors.`);
+    }
+    
+    // Current time display with correct UTC offset formatting
+    function updateTimeDisplays() {
+      const now = luxon.DateTime.now();
+      
+      const gmtTime = now.setZone("Europe/Lisbon");
+      document.getElementById("gmt-time").textContent = gmtTime.toFormat("HH:mm:ss");
+      document.getElementById("gmt-offset").textContent = `UTC${gmtTime.toFormat('Z')}`;
+      
+      const cetTime = now.setZone("Europe/Berlin");
+      document.getElementById("cet-time").textContent = cetTime.toFormat("HH:mm:ss");
+      document.getElementById("cet-offset").textContent = `UTC${cetTime.toFormat('Z')}`;
+      
+      const eetTime = now.setZone("Europe/Tallinn");
+      document.getElementById("eet-time").textContent = eetTime.toFormat("HH:mm:ss");
+      document.getElementById("eet-offset").textContent = `UTC${eetTime.toFormat('Z')}`;
+      
+      requestAnimationFrame(updateTimeDisplays);
+    }
+    
+    // Draw timeline chart for selected country using aggregated data
+    function drawTimelineChart(country, metric, aggregation) {
+      const data = allData[country][aggregation];
+      const container = d3.select("#timeline-chart");
+      container.selectAll("*").remove();
+      
+      // Early exit if no data
+      if (!data || data.length === 0) {
+        container.append("text")
+          .attr("x", "50%")
+          .attr("y", "50%")
+          .attr("text-anchor", "middle")
+          .text("No data available")
+          .attr("fill", "#bbdefb");
+        return;
+      }
+      
+      const width = 600;
+      const height = 320;
+      const margin = { top: 20, right: 30, bottom: 50, left: 60 };
+      
+      const svg = container.append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+      // Update panel title based on aggregation
+      const titles = {
+        hourly: "Energy Consumption Timeline (Local Time)",
+        daily: "Daily Energy Consumption",
+        weekly: "Weekly Energy Consumption",
+        monthly: "Monthly Energy Consumption"
+      };
+      d3.select("#timeline-panel h2").text(titles[aggregation]);
+
+      if (aggregation === "hourly") {
+        // Hourly visualization
+        const x = d3.scaleLinear()
+          .domain([0, 24])
+          .range([margin.left, width - margin.right]);
+        
+        const y = d3.scaleLinear()
+          .domain([0, d3.max(data, d => d[metric]) * 1.1])
+          .range([height - margin.bottom, margin.top]);
+        
+        const line = d3.line()
+          .x(d => x(d.hour))
+          .y(d => y(d[metric]))
+          .curve(d3.curveMonotoneX);
+        
+        svg.append("g")
+          .attr("transform", `translate(0, ${height - margin.bottom})`)
+          .call(d3.axisBottom(x).tickValues([0, 6, 12, 18, 24]).tickFormat(d => `${d}:00`))
+          .attr("color", "#bbdefb");
+        
+        svg.append("g")
+          .attr("transform", `translate(${margin.left}, 0)`)
+          .call(d3.axisLeft(y))
+          .attr("color", "#bbdefb");
+        
+        svg.append("g")
+          .attr("class", "grid")
+          .attr("transform", `translate(0, ${height - margin.bottom})`)
+          .call(d3.axisBottom(x).tickValues(d3.range(0, 25, 3)).tickSize(-height + margin.top + margin.bottom).tickFormat(""))
+          .attr("color", "rgba(187, 222, 251, 0.1)");
+        
+        svg.append("g")
+          .attr("class", "grid")
+          .attr("transform", `translate(${margin.left}, 0)`)
+          .call(d3.axisLeft(y).tickSize(-width + margin.left + margin.right).tickFormat(""))
+          .attr("color", "rgba(187, 222, 251, 0.1)");
+        
+        svg.append("path")
+          .datum(data)
+          .attr("fill", "none")
+          .attr("stroke", "#4fc3f7")
+          .attr("stroke-width", 3)
+          .attr("d", line);
+
+        svg.selectAll(".dot")
+          .data(data)
+          .enter().append("circle")
+          .attr("class", "dot")
+          .attr("cx", d => x(d.hour))
+          .attr("cy", d => y(d[metric]))
+          .attr("r", 4)
+          .attr("fill", "#4fc3f7");
+        
+        svg.append("text")
+          .attr("transform", "rotate(-90)")
+          .attr("y", 5)
+          .attr("x", -(height / 2))
+          .attr("dy", "1em")
+          .attr("text-anchor", "middle")
+          .text(metric === 'energy' ? "Avg. Energy (kWh)" : "Avg. CO2 (kg)")
+          .attr("fill", "#bbdefb");
+          
+      } else {
+        // Daily/Weekly/Monthly visualization
+        const x = d3.scaleTime()
+          .domain(d3.extent(data, d => d.dateObj))
+          .range([margin.left, width - margin.right]);
+        
+        const y = d3.scaleLinear()
+          .domain([0, d3.max(data, d => d[metric]) * 1.1])
+          .range([height - margin.bottom, margin.top]);
+        
+        const line = d3.line()
+          .x(d => x(d.dateObj))
+          .y(d => y(d[metric]))
+          .curve(d3.curveMonotoneX);
+        
+        // Determine appropriate time formatting
+        let xAxisFormat;
+        if (aggregation === "daily") {
+          xAxisFormat = d3.timeFormat("%b %d");
+        } else if (aggregation === "weekly") {
+          xAxisFormat = d3.timeFormat("%b %d");
+        } else { // monthly
+          xAxisFormat = d3.timeFormat("%b %Y");
+        }
+        
+        // Create and format x-axis
+        const xAxis = d3.axisBottom(x)
+          .tickFormat(xAxisFormat);
+        
+        svg.append("g")
+          .attr("transform", `translate(0, ${height - margin.bottom})`)
+          .call(xAxis)
+          .attr("color", "#bbdefb");
+        
+        svg.append("g")
+          .attr("transform", `translate(${margin.left}, 0)`)
+          .call(d3.axisLeft(y))
+          .attr("color", "#bbdefb");
+        
+        // Add grid lines
+        svg.append("g")
+          .attr("class", "grid")
+          .attr("transform", `translate(0, ${height - margin.bottom})`)
+          .call(d3.axisBottom(x).tickSize(-height + margin.top + margin.bottom).tickFormat(""))
+          .attr("color", "rgba(187, 222, 251, 0.1)");
+        
+        svg.append("g")
+          .attr("class", "grid")
+          .attr("transform", `translate(${margin.left}, 0)`)
+          .call(d3.axisLeft(y).tickSize(-width + margin.left + margin.right).tickFormat(""))
+          .attr("color", "rgba(187, 222, 251, 0.1)");
+        
+        // Draw the line
+        svg.append("path")
+          .datum(data)
+          .attr("fill", "none")
+          .attr("stroke", "#4fc3f7")
+          .attr("stroke-width", 3)
+          .attr("d", line);
+        
+        // Add data points
+        svg.selectAll(".dot")
+          .data(data)
+          .enter().append("circle")
+          .attr("class", "dot")
+          .attr("cx", d => x(d.dateObj))
+          .attr("cy", d => y(d[metric]))
+          .attr("r", 4)
+          .attr("fill", "#4fc3f7");
+        
+        // Add tooltip interaction
+        const tooltip = d3.select(".tooltip");
+        
+        svg.selectAll(".dot")
+          .on("mouseover", function(event, d) {
+            const dateStr = aggregation === "daily" ? 
+              luxon.DateTime.fromJSDate(d.dateObj).toFormat("MMM dd, yyyy") :
+              aggregation === "weekly" ? 
+              `Week of ${luxon.DateTime.fromJSDate(d.dateObj).toFormat("MMM dd")}` :
+              luxon.DateTime.fromJSDate(d.dateObj).toFormat("MMM yyyy");
+            
+            tooltip.style("opacity", 0.9)
+              .html(`
+                <strong>${dateStr}</strong><br>
+                ${metric === 'energy' ? 'Energy' : 'CO2'}: ${d[metric].toLocaleString()} 
+                ${metric === 'energy' ? 'kWh' : 'kg'}
+              `)
+              .style("left", (event.pageX + 10) + "px")
+              .style("top", (event.pageY - 70) + "px");
+          })
+          .on("mouseout", function() {
+            tooltip.style("opacity", 0);
+          });
+        
+        // Axis labels
+        svg.append("text")
+          .attr("transform", `translate(${width / 2}, ${height - 10})`)
+          .attr("text-anchor", "middle")
+          .text("Date")
+          .attr("fill", "#bbdefb");
+        
+        svg.append("text")
+          .attr("transform", "rotate(-90)")
+          .attr("y", 5)
+          .attr("x", -(height / 2))
+          .attr("dy", "1em")
+          .attr("text-anchor", "middle")
+          .text(metric === 'energy' ? "Total Energy (kWh)" : "Total CO2 (kg)")
+          .attr("fill", "#bbdefb");
+      }
+    }
+
+    // Uses raw data to find a specific time point
+    function drawUTCComparisonChart(metric, selectedCountry) {
+      const container = d3.select("#utc-comparison-chart");
+      container.selectAll("*").remove();
+
+      // Check if we have data for any country
+      if (Object.keys(allData).length === 0) {
+        container.append("text")
+          .attr("x", "50%")
+          .attr("y", "50%")
+          .attr("text-anchor", "middle")
+          .text("No data available")
+          .attr("fill", "#bbdefb");
+        return;
+      }
+
+      const width = 600;
+      const height = 320;
+      const margin = { top: 40, right: 30, bottom: 50, left: 70 };
+
+      const svg = container.append("svg")
+        .attr("width", width)
+        .attr("height", height);
+      
+      const utcHour = 7;
+      
+      const comparisonData = Object.keys(allData)
+        .filter(country => allData[country] && allData[country].raw)
+        .map(country => {
+          const dataPoint = allData[country].raw.find(d => d.utcHour === utcHour);
+          return dataPoint ? {
+            country: country,
+            data: dataPoint,
+            color: country === 'Portugal' ? '#4fc3f7' : 
+                   country === 'Germany' ? '#29b6f6' : '#039be5'
+          } : null;
+        })
+        .filter(d => d !== null);
+      
+      // Check if we have data for the comparison
+      if (comparisonData.length === 0) {
+        svg.append("text")
+          .attr("x", width/2)
+          .attr("y", height/2)
+          .attr("text-anchor", "middle")
+          .text("No data available for UTC " + utcHour + ":00")
+          .attr("fill", "#bbdefb");
+        return;
+      }
+      
+      const x = d3.scaleBand()
+        .domain(comparisonData.map(d => d.country))
+        .range([margin.left, width - margin.right])
+        .padding(0.2);
+      
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(comparisonData, d => d.data[metric]) * 1.2 || 1000])
+        .range([height - margin.bottom, margin.top]);
+      
+      svg.append("g")
+        .attr("transform", `translate(0, ${height - margin.bottom})`)
+        .call(d3.axisBottom(x))
+        .attr("color", "#bbdefb");
+      
+      svg.append("g")
+        .attr("transform", `translate(${margin.left}, 0)`)
+        .call(d3.axisLeft(y))
+        .attr("color", "#bbdefb");
+      
+      svg.selectAll(".bar")
+        .data(comparisonData)
+        .enter().append("rect")
+        .attr("class", "bar")
+        .attr("x", d => x(d.country))
+        .attr("y", d => y(d.data[metric]))
+        .attr("width", x.bandwidth())
+        .attr("height", d => height - margin.bottom - y(d.data[metric]))
+        .attr("fill", d => d.color)
+        .style("opacity", d => d.country === selectedCountry ? 1.0 : 0.4)
+        .style("stroke", d => d.country === selectedCountry ? "#e1f5fe" : "none")
+        .style("stroke-width", 2)
+        .on("mouseover", function(event, d) {
+          const localHour = luxon.DateTime.fromISO(d.data.timestamp).hour;
+          const localMinute = luxon.DateTime.fromISO(d.data.timestamp).minute;
+          const tooltip = d3.select(".tooltip");
+          tooltip.style("opacity", 0.9)
+            .html(`
+              <strong>${d.country}</strong><br>
+              UTC Time: ${utcHour}:00<br>
+              Local Time: ${localHour}:${localMinute.toString().padStart(2, '0')}<br>
+              ${metric === 'energy' ? 'Energy' : 'CO2'}: ${d.data[metric].toLocaleString()} 
+              ${metric === 'energy' ? 'kWh' : 'kg'}
+            `)
+            .style("left", (event.pageX + 10) + "px")
+            .style("top", (event.pageY - 70) + "px");
+        })
+        .on("mouseout", function() {
+          d3.select(".tooltip").style("opacity", 0);
+        });
+      
+      svg.selectAll(".label")
+        .data(comparisonData)
+        .enter().append("text")
+        .text(d => d.data[metric].toLocaleString())
+        .attr("x", d => x(d.country) + x.bandwidth() / 2)
+        .attr("y", d => y(d.data[metric]) - 10)
+        .attr("text-anchor", "middle")
+        .attr("fill", "white")
+        .attr("font-weight", "bold");
+      
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", margin.top - 10)
+        .attr("text-anchor", "middle")
+        .text(`Energy Consumption at UTC ${utcHour}:00`)
+        .attr("fill", "#4fc3f7")
+        .attr("font-size", "1.1rem");
+      
+      svg.append("text")
+        .attr("transform", `translate(${width / 2}, ${height - 10})`)
+        .attr("text-anchor", "middle")
+        .text("Country")
+        .attr("fill", "#bbdefb");
+      
+      svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 10)
+        .attr("x", -(height / 2))
+        .attr("dy", "1em")
+        .attr("text-anchor", "middle")
+        .text(metric === 'energy' ? "Energy Consumption (kWh)" : "CO2 Emissions (kg)")
+        .attr("fill", "#bbdefb");
+    }
+
+    // Uses aggregated data for clean comparison
+    function drawPatternComparisonChart(metric) {
+      const container = d3.select("#pattern-comparison-chart");
+      container.selectAll("*").remove();
+      
+      const width = 600;
+      const height = 320;
+      const margin = { top: 20, right: 120, bottom: 50, left: 60 };
+      
+      const svg = container.append("svg")
+        .attr("width", width)
+        .attr("height", height);
+      
+      // Get countries with available hourly data
+      const validCountries = Object.keys(allData).filter(
+        country => allData[country] && allData[country].hourly && allData[country].hourly.length > 0
+      );
+      
+      if (validCountries.length === 0) {
+        svg.append("text")
+          .attr("x", width/2)
+          .attr("y", height/2)
+          .attr("text-anchor", "middle")
+          .text("No hourly data available")
+          .attr("fill", "#bbdefb");
+        return;
+      }
+      
+      let maxVal = 0;
+      validCountries.forEach(country => {
+        const countryMax = d3.max(allData[country].hourly, d => d[metric]);
+        if (countryMax > maxVal) maxVal = countryMax;
+      });
+
+      const x = d3.scaleLinear()
+        .domain([0, 24])
+        .range([margin.left, width - margin.right]);
+      
+      const y = d3.scaleLinear()
+        .domain([0, maxVal * 1.1])
+        .range([height - margin.bottom, margin.top]);
+      
+      const line = d3.line()
+        .x(d => x(d.hour))
+        .y(d => y(d[metric]))
+        .curve(d3.curveMonotoneX);
+      
+      svg.append("g")
+        .attr("transform", `translate(0, ${height - margin.bottom})`)
+        .call(d3.axisBottom(x).tickValues([0, 6, 12, 18, 24]).tickFormat(d => `${d}:00`))
+        .attr("color", "#bbdefb");
+      
+      svg.append("g")
+        .attr("transform", `translate(${margin.left}, 0)`)
+        .call(d3.axisLeft(y))
+        .attr("color", "#bbdefb");
+
+      const colors = { Portugal: "#4fc3f7", Germany: "#29b6f6", Estonia: "#039be5"};
+      const legendData = [];
+
+      validCountries.forEach(country => {
+        svg.append("path")
+          .datum(allData[country].hourly)
+          .attr("fill", "none")
+          .attr("stroke", colors[country])
+          .attr("stroke-width", 2)
+          .attr("d", line);
+        legendData.push({ country, color: colors[country] });
+      });
+
+      const legend = svg.append("g")
+        .attr("transform", `translate(${width - 110}, ${margin.top})`);
+      
+      legendData.forEach((d, i) => {
+          legend.append("rect")
+            .attr("x", 0)
+            .attr("y", i * 20)
+            .attr("width", 12)
+            .attr("height", 12)
+            .attr("fill", d.color);
+          
+          legend.append("text")
+            .attr("x", 20)
+            .attr("y", i * 20 + 10)
+            .text(d.country)
+            .attr("fill", "#bbdefb")
+            .attr("font-size", "12px");
+      });
+      
+      svg.append("text")
+        .attr("transform", `translate(${width / 2}, ${height - 10})`)
+        .attr("text-anchor", "middle")
+        .text("Local Hour of Day")
+        .attr("fill", "#bbdefb");
+      
+      svg.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 5)
+        .attr("x", -(height / 2))
+        .attr("dy", "1em")
+        .attr("text-anchor", "middle")
+        .text(metric === 'energy' ? "Avg. Energy (kWh)" : "Avg. CO2 (kg)")
+        .attr("fill", "#bbdefb");
+    }
+
+    // Uses raw data for accurate statistical distribution
+    function drawConsumptionDistributionChart(country, metric) {
+      const data = allData[country].raw;
+      const container = d3.select("#distribution-chart");
+      container.selectAll("*").remove();
+      
+      const levelsContainer = d3.select("#levels-container");
+      levelsContainer.selectAll("*").remove();
+      
+      const statsContainer = d3.select("#stats-container");
+      statsContainer.selectAll("*").remove();
+      
+      // Check if we have data
+      if (!data || data.length === 0) {
+        container.append("text")
+          .attr("x", "50%")
+          .attr("y", "50%")
+          .attr("text-anchor", "middle")
+          .text("No data available")
+          .attr("fill", "#bbdefb");
+        return;
+      }
+      
+      const values = data.map(d => d[metric]);
+      
+      const min = d3.min(values);
+      const max = d3.max(values);
+      const avg = d3.mean(values);
+      
+      statsContainer.html(`
+        <div class="stat-card">
+          <div class="stat-label">Minimum</div>
+          <div class="stat-value">${min.toLocaleString()}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Average</div>
+          <div class="stat-value">${avg.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Maximum</div>
+          <div class="stat-value">${max.toLocaleString()}</div>
+        </div>
+      `);
+      
+      const lowThreshold = min + (max - min) * 0.33;
+      const mediumThreshold = min + (max - min) * 0.66;
+      
+      let lowCount = 0, mediumCount = 0, highCount = 0;
+      data.forEach(d => {
+        if (d[metric] < lowThreshold) lowCount++;
+        else if (d[metric] < mediumThreshold) mediumCount++;
+        else highCount++;
+      });
+      
+      const total = data.length;
+      const pieData = [
+        { level: "Low", count: lowCount, color: "#4fc3f7", percentage: lowCount/total },
+        { level: "Medium", count: mediumCount, color: "#29b6f6", percentage: mediumCount/total },
+        { level: "High", count: highCount, color: "#039be5", percentage: highCount/total }
+      ];
+      
+      levelsContainer.html(`
+        <div class="level-card">
+          <div class="level-color" style="background-color: #4fc3f7"></div>
+          <div>Low: &lt; ${lowThreshold.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+        </div>
+        <div class="level-card">
+          <div class="level-color" style="background-color: #29b6f6"></div>
+          <div>Medium</div>
+        </div>
+        <div class="level-card">
+          <div class="level-color" style="background-color: #039be5"></div>
+          <div>High: &gt; ${mediumThreshold.toLocaleString(undefined, {maximumFractionDigits: 0})}</div>
+        </div>
+      `);
+      
+      const width = 350;
+      const height = 350;
+      const radius = Math.min(width, height) / 2;
+      const innerRadius = radius * 0.5;
+      
+      const svg = container.append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .append("g")
+        .attr("transform", `translate(${width / 2}, ${height / 2})`);
+      
+      const pie = d3.pie()
+        .value(d => d.count)
+        .sort(null);
+      
+      const arc = d3.arc()
+        .innerRadius(innerRadius)
+        .outerRadius(radius);
+      
+      const arcs = svg.selectAll(".arc")
+        .data(pie(pieData))
+        .enter().append("g")
+        .attr("class", "arc");
+      
+      arcs.append("path")
+        .attr("d", arc)
+        .attr("fill", d => d.data.color)
+        .attr("stroke", "#0f2027")
+        .style("stroke-width", "2px")
+        .style("opacity", 0.8)
+        .on("mouseover", function(event, d) {
+          d3.select(this).style("opacity", 1);
+          const tooltip = d3.select(".tooltip");
+          tooltip.style("opacity", 0.9)
+            .html(`
+              <strong>${d.data.level} Consumption</strong><br>
+              Readings: ${d.data.count} (${(d.data.percentage * 100).toFixed(1)}%)
+            `)
+            .style("left", (event.pageX + 10) + "px")
+            .style("top", (event.pageY - 70) + "px");
+        })
+        .on("mouseout", function() {
+          d3.select(this).style("opacity", 0.8);
+          d3.select(".tooltip").style("opacity", 0);
+        });
+      
+      arcs.append("text")
+        .attr("transform", d => `translate(${arc.centroid(d)})`)
+        .attr("text-anchor", "middle")
+        .attr("dy", "0.35em")
+        .attr("fill", "white")
+        .attr("font-weight", "bold")
+        .text(d => d.data.count > 0 ? `${(d.data.percentage * 100).toFixed(0)}%` : '');
+      
+      svg.append("text")
+        .attr("text-anchor", "middle")
+        .attr("dy", "-0.5em")
+        .attr("fill", "#4fc3f7")
+        .attr("font-size", "18px")
+        .attr("font-weight", "bold")
+        .text(`${country}`);
+      
+      svg.append("text")
+        .attr("text-anchor", "middle")
+        .attr("dy", "1em")
+        .attr("fill", "#bbdefb")
+        .attr("font-size", "14px")
+        .text("Distribution");
+    }
+
+    /**
+     * Update all charts based on the selected country.
+     * Fetches and aggregates data if it's not already cached.
+     */
+    async function updateCharts() {
+        const select = document.getElementById("country-select");
+        const selectedOption = select.options[select.selectedIndex];
+        const country = selectedOption.value;
+        const aggregation = document.getElementById('aggregation-select').value;
+        
+        // Show loading state in all panels
+        showLoading("#timeline-chart");
+        showLoading("#utc-comparison-chart");
+        showLoading("#pattern-comparison-chart");
+        showLoading("#distribution-chart");
+
+        // Fetch data for all countries if not already cached
+        for (const option of select.options) {
+            const countryName = option.value;
+            if (!allData[countryName]) {
+                const rawData = await fetchAndParseXML(option.dataset.filename, option.dataset.timezone);
+                if (rawData) {
+                    allData[countryName] = {
+                        raw: rawData,
+                        hourly: aggregateDataByHour(rawData),
+                        daily: aggregateDataByDay(rawData),
+                        weekly: aggregateDataByWeek(rawData),
+                        monthly: aggregateDataByMonth(rawData)
+                    };
+                } else {
+                    allData[countryName] = null;
+                }
+            }
+        }
+        
+        // Check if data for the selected country loaded successfully
+        if (!allData[country] || !allData[country].raw) {
+            showError("#timeline-chart", country);
+            showError("#utc-comparison-chart", country);
+            showError("#pattern-comparison-chart", country);
+            showError("#distribution-chart", country);
+            return; // Stop execution
+        }
+        
+        const metric = 'energy';
+        
+        // Now that data is loaded, draw the charts
+        drawTimelineChart(country, metric, aggregation);
+        drawUTCComparisonChart(metric, country);
+        drawPatternComparisonChart(metric);
+        drawConsumptionDistributionChart(country, metric);
+    }
+    
+    function initDashboard() {
+      // Create the tooltip element
+      d3.select("body").append("div")
+        .attr("class", "tooltip")
+        .style("opacity", 0);
+
+      // Set up event listeners
+      document.getElementById("aggregation-select").addEventListener("change", updateCharts);
+      document.getElementById("country-select").addEventListener("change", updateCharts);
+      
+      // Initialize dashboard
+      updateCharts();
+      updateTimeDisplays();
+    }
+    
+    window.addEventListener("load", initDashboard);
+  </script>
+</body>
+</html>
